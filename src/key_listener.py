@@ -788,21 +788,30 @@ class PynputBackend(InputBackend):
             self.mouse_listener.stop()
             self.mouse_listener = None
 
-    def _translate_key_event(self, native_event) -> tuple[KeyCode, InputEvent]:
+    def _translate_key_event(self, native_event) -> tuple[KeyCode, InputEvent] | None:
         """Translate a pynput event to our internal event representation."""
         pynput_key, is_press = native_event
-        key_code = self.key_map.get(pynput_key, KeyCode.SPACE)
+        if pynput_key not in self.key_map:
+            # Log it, so you at least know which key came in
+            print(f"Unmapped key received: {pynput_key} (type: {type(pynput_key)}) - ignoring.")
+            return None  # Return None to indicate "no recognized event"
+        
+        key_code = self.key_map[pynput_key]
         event_type = InputEvent.KEY_PRESS if is_press else InputEvent.KEY_RELEASE
         return key_code, event_type
 
     def _on_keyboard_press(self, key):
         """Handle keyboard press events."""
         translated_event = self._translate_key_event((key, True))
+        if translated_event is None:
+            return  # Unknown key, do nothing
         self.on_input_event(translated_event)
 
     def _on_keyboard_release(self, key):
         """Handle keyboard release events."""
         translated_event = self._translate_key_event((key, False))
+        if translated_event is None:
+            return
         self.on_input_event(translated_event)
 
     def _on_mouse_click(self, x, y, button, pressed):
@@ -812,7 +821,7 @@ class PynputBackend(InputBackend):
 
     def _create_key_map(self):
         """Create a mapping from pynput keys to our internal KeyCode enum."""
-        return {
+        key_map = {
             # Modifier keys
             self.keyboard.Key.ctrl_l: KeyCode.CTRL_LEFT,
             self.keyboard.Key.ctrl_r: KeyCode.CTRL_RIGHT,
@@ -953,6 +962,9 @@ class PynputBackend(InputBackend):
             self.mouse.Button.right: KeyCode.MOUSE_RIGHT,
             self.mouse.Button.middle: KeyCode.MOUSE_MIDDLE,
         }
+        # Explicit mapping for '\x15':
+        key_map[self.keyboard.KeyCode.from_char('\x15')] = KeyCode.U  # or another KeyCode
+        return key_map
 
     def on_input_event(self, event):
         """
