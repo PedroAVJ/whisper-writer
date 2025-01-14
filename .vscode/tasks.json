@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup Python Environment",
+      "type": "shell",
+      "command": "if (-not (Test-Path venv)) { py -3.11 -m venv venv }; .\\venv\\Scripts\\activate; .\\venv\\Scripts\\python.exe -m pip install -r requirements.txt",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
