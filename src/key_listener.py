@@ -792,8 +792,6 @@ class PynputBackend(InputBackend):
         """Translate a pynput event to our internal event representation."""
         pynput_key, is_press = native_event
         if pynput_key not in self.key_map:
-            # Log it, so you at least know which key came in
-            print(f"Unmapped key received: {pynput_key} (type: {type(pynput_key)}) - ignoring.")
             return None  # Return None to indicate "no recognized event"
         
         key_code = self.key_map[pynput_key]
