@@ -3,6 +3,9 @@ import os
 import signal
 import time
 from pynput.keyboard import Controller as PynputController
+from pynput.keyboard import Key
+import pyperclip
+import platform
 
 from utils import ConfigManager
 
@@ -31,9 +34,11 @@ class InputSimulator:
         self.input_method = ConfigManager.get_config_value('post_processing', 'input_method')
         self.dotool_process = None
 
-        if self.input_method == 'pynput':
-            self.keyboard = PynputController()
-        elif self.input_method == 'dotool':
+        # We’ll just initialize Pynput here for cross-platform usage
+        self.keyboard = PynputController()
+        
+        # If there's any platform-specific initialization needed:
+        if self.input_method == 'dotool':
             self._initialize_dotool()
 
     def _initialize_dotool(self):
@@ -53,26 +58,46 @@ class InputSimulator:
 
     def typewrite(self, text):
         """
-        Simulate typing the given text with the specified interval between keystrokes.
-
-        Args:
-            text (str): The text to type.
+        Simulate typing the given text. On Windows, this now copies to the clipboard
+        and pastes it once, restoring the original clipboard contents afterwards.
         """
-        interval = ConfigManager.get_config_value('post_processing', 'writing_key_press_delay')
-        if self.input_method == 'pynput':
-            self._typewrite_pynput(text, interval)
-        elif self.input_method == 'ydotool':
-            self._typewrite_ydotool(text, interval)
-        elif self.input_method == 'dotool':
-            self._typewrite_dotool(text, interval)
+        # If you're specifically on Windows, do the clipboard-based approach:
+        if platform.system().lower().startswith("win"):
+            self._typewrite_windows_clipboard(text)
+        else:
+            # Fallback to existing logic (optional; remove or keep as needed):
+            interval = ConfigManager.get_config_value('post_processing', 'writing_key_press_delay')
+            if self.input_method == 'pynput':
+                self._typewrite_pynput(text, interval)
+            elif self.input_method == 'ydotool':
+                self._typewrite_ydotool(text, interval)
+            elif self.input_method == 'dotool':
+                self._typewrite_dotool(text, interval)
+
+    def _typewrite_windows_clipboard(self, text):
+        """
+        On Windows: copy text to the clipboard in one go, paste it, then restore the original clipboard state.
+        """
+        # Save the original clipboard content
+        original_clip = pyperclip.paste()
+
+        # Copy our desired text
+        pyperclip.copy(text)
+
+        # Simulate Ctrl+V
+        with self.keyboard.pressed(Key.ctrl):
+            self.keyboard.press('v')
+            self.keyboard.release('v')
+
+        # Optionally, add a small delay
+        time.sleep(0.1)
+
+        # Restore the original clipboard content
+        pyperclip.copy(original_clip)
 
     def _typewrite_pynput(self, text, interval):
         """
         Simulate typing using pynput.
-
-        Args:
-            text (str): The text to type.
-            interval (float): The interval between keystrokes in seconds.
         """
         for char in text:
             self.keyboard.press(char)
@@ -82,10 +107,6 @@ class InputSimulator:
     def _typewrite_ydotool(self, text, interval):
         """
         Simulate typing using ydotool.
-
-        Args:
-            text (str): The text to type.
-            interval (float): The interval between keystrokes in seconds.
         """
         cmd = "ydotool"
         run_command_or_exit_on_failure([
@@ -100,10 +121,6 @@ class InputSimulator:
     def _typewrite_dotool(self, text, interval):
         """
         Simulate typing using dotool.
-
-        Args:
-            text (str): The text to type.
-            interval (float): The interval between keystrokes in seconds.
         """
         assert self.dotool_process and self.dotool_process.stdin
         self.dotool_process.stdin.write(f"typedelay {interval * 1000}\n")
